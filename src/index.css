@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;800&family=JetBrains+Mono&display=swap');
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary-bg: #A2E8FF;
+  --color-primary-accent: #0D9488;
+  --color-cta-yellow: #F5E642;
+  --color-card-bg: #FFFFFF;
+  --color-dark-navy: #0D0D1A;
+  --color-xp-gold: #E8B96F;
+  --color-soft-green: #EAF3DE;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-primary-bg text-[#1e2d3d] dark:text-indigo-50 transition-colors duration-300;
+  }
+  .dark body {
+    background: linear-gradient(135deg, #0A0F2C 0%, #171A4A 50%, #291C55 100%);
+    background-attachment: fixed;
+  }
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.fanned-card {
+  transition: transform 0.3s ease;
+}
+
+.fanned-card:hover {
+  transform: translateY(-10px) rotate(0deg) scale(1.05) !important;
+  z-index: 50;
+}
+
+.custom-shadow, .tactile-btn {
+  box-shadow: 0 4px 0 0 rgba(0,0,0,0.1);
+}
+
+.button-raised {
+  box-shadow: 0 4px 0 0 rgba(0,0,0,0.1);
+}
+
+.button-raised:active, .tactile-btn:active {
+  box-shadow: 0 0 0 0 rgba(0,0,0,0.1);
+  transform: translateY(4px);
+}
+
+.quest-glow {
+  box-shadow: 0 0 0 6px rgba(245, 230, 66, 0.4);
+}
+
+.dashed-path {
+  background-image: repeating-linear-gradient(90deg, #0D9488, #0D9488 10px, transparent 10px, transparent 20px);
+}
+
+.hidden-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hidden-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom styles for AI Companion scrollbar */
+.clip-mountain {
+  clip-path: polygon(0 40%, 15% 30%, 30% 60%, 50% 10%, 75% 50%, 100% 30%, 100% 100%, 0 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Markdown styling adjustments */
+.markdown-body pre {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+  background-color: #0f172a;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+}
+.markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: #38bdf8;
+}
+.markdown-body p code {
+  background-color: rgba(15, 23, 42, 0.05);
+  color: #0369a1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+}
+.dark .markdown-body p code {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #7dd3fc;
+}
