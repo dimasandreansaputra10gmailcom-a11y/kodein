@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing level, xp, and auth details",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "streak": { "type": "number" },
+        "lives": { "type": "number" },
+        "isAdmin": { "type": "boolean" },
+        "tier": { "type": "string" },
+        "institution": { "type": "string" },
+        "avatar": { "type": "string" },
+        "unlockedStages": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "email", "level", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A user's post in the community",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "content", "likesCount", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Realtime chat message",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "text": { "type": "string" },
+        "roomId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "text", "roomId", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "read", "createdAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Educational content for a stage",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "levelId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "levelId", "stageId"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Quiz questions for a stage",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "correctAnswer": { "type": "number" },
+        "levelId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["question", "options", "correctAnswer", "levelId", "stageId"]
+    },
+    "UserProgress": {
+      "title": "User Progress",
+      "description": "Track the completion and answers of a user on a stage",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "levelId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "code": { "type": "string" },
+        "score": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "levelId", "stageId", "completedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profile data. Auth users can manage their own data."
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Stores text and markdown materials for the adventure stages. Only admins can write, all can read."
+    },
+    "/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/Question" },
+      "description": "Stores quiz questions. Only admins can write, all can read."
+    },
+    "/progress/{progressId}": {
+      "schema": { "$ref": "#/entities/UserProgress" },
+      "description": "Stores user completion status and saved code for challenges."
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Stores user posts. Users can create, update, delete their own posts. Anyone can read."
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Stores chat messages. Users can create messages, everyone can read."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Stores user notifications. Users can read and update their own."
+    }
+  }
+}

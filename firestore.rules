@@ -1,0 +1,224 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isAdmin() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true; 
+    }
+
+    // --- Users ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['username', 'email', 'level', 'createdAt']) &&
+             data.username is string && data.username.size() > 0 &&
+             (!('fullName' in data) || data.fullName is string) &&
+             data.email is string &&
+             data.level is number &&
+             data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+                       isValidUser(incoming()) && 
+                       incoming().createdAt == request.time &&
+                       (incoming().isAdmin == false || (incoming().isAdmin == true && request.auth.token.email == 'ineddewa@gmail.com')); 
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && isValidUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'fullName', 'level', 'xp', 'streak', 'lives', 'avatar', 'tier', 'institution', 'unlockedStages', 'completedChallenges', 'updatedAt', 'loginPin', 'lastFullNameUpdate', 'lastUsernameUpdate', 'weeklyXpActivity', 'lastActiveDate', 'lastLogicQuestDate', 'lastPatternQuizDate', 'lastCommunityMessageDate', 'badges', 'joinDate']) && incoming().updatedAt == request.time) ||
+        (isAdmin() && isValidUser(incoming()))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- Materials ---
+    function isValidMaterial(data) {
+      return data.keys().hasAll(['title', 'content', 'levelId', 'stageId', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.content is string &&
+             data.levelId is string &&
+             data.stageId is string &&
+             data.createdAt is timestamp;
+    }
+
+    match /materials/{materialId} {
+      allow read: if isSignedIn(); // Allow list implicitly if condition doesn't use `resource`
+      allow create: if isAdmin() && isValidId(materialId) && isValidMaterial(incoming());
+      allow update: if isAdmin() && isValidMaterial(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- Questions ---
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['question', 'options', 'correctAnswer', 'levelId', 'stageId', 'createdAt']) &&
+             data.question is string && data.question.size() > 0 &&
+             data.options is list && data.options.size() > 0 && data.options[0] is string &&
+             data.correctAnswer is number &&
+             data.levelId is string &&
+             data.stageId is string &&
+             data.createdAt is timestamp;
+    }
+
+    match /questions/{questionId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidId(questionId) && isValidQuestion(incoming());
+      allow update: if isAdmin() && isValidQuestion(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- User Progress ---
+    function isValidProgress(data) {
+      return data.keys().hasAll(['userId', 'levelId', 'stageId', 'completedAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.levelId is string &&
+             data.stageId is string &&
+             data.completedAt is timestamp;
+    }
+
+    match /progress/{progressId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(progressId) && isValidProgress(incoming()) && incoming().completedAt == request.time;
+      allow update: if isSignedIn() && request.auth.uid == existing().userId && isValidProgress(incoming()) && incoming().completedAt == request.time;
+      allow delete: if isAdmin();
+    }
+    // --- Forums & Messages ---
+    function isValidForum(data) {
+      return data.keys().hasAll(['title', 'description', 'authorId', 'authorName', 'memberCount', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.authorId is string && data.authorId == request.auth.uid &&
+             data.authorName is string &&
+             data.memberCount is number &&
+             data.createdAt is timestamp;
+    }
+
+    match /forums/{forumId} {
+      function isForumAuthor() {
+        let forumDoc = get(/databases/$(database)/documents/forums/$(forumId));
+        return forumDoc != null && forumDoc.data.authorId == request.auth.uid;
+      }
+      function isModerator() {
+        let memberDoc = get(/databases/$(database)/documents/forums/$(forumId)/members/$(request.auth.uid));
+        return memberDoc != null && memberDoc.data.get('role', '') == 'moderator';
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(forumId) && isValidForum(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() || (isSignedIn() && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && incoming().updatedAt == request.time && incoming().memberCount is number) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'updatedAt', 'pinnedMessage', 'authorName']) && incoming().updatedAt == request.time) ||
+        (isModerator() && incoming().diff(existing()).affectedKeys().hasOnly(['pinnedMessage', 'updatedAt']) && incoming().updatedAt == request.time)
+      ));
+      allow delete: if isAdmin() || (isSignedIn() && existing().authorId == request.auth.uid);
+      
+      function isValidMember(data) {
+        return data.keys().hasAll(['userId', 'userName', 'joinedAt']) &&
+               data.userId is string &&
+               data.userName is string &&
+               data.joinedAt is timestamp &&
+               (!('notificationsEnabled' in data) || data.notificationsEnabled is bool) &&
+               (!('role' in data) || (data.role is string && (data.role == 'member' || data.role == 'moderator' || data.role == 'creator')));
+      }
+
+      match /members/{memberId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && memberId == request.auth.uid && isValidMember(incoming());
+        allow update: if isAdmin() || (isSignedIn() && (
+          (memberId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['notificationsEnabled', 'userName', 'updatedAt'])) ||
+          (isForumAuthor() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt'])) ||
+          (isModerator() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt']))
+        ));
+        allow delete: if isAdmin() || (isSignedIn() && (
+          memberId == request.auth.uid || 
+          isForumAuthor() ||
+          isModerator()
+        ));
+      }
+
+      function isValidMessage(data) {
+        return data.keys().hasAll(['userId', 'userName', 'userLevel', 'userAvatar', 'text', 'createdAt']) &&
+               data.userId is string &&
+               data.userName is string &&
+               data.userLevel is string &&
+               data.userAvatar is string &&
+               data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+               data.createdAt is timestamp;
+      }
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming()) && incoming().createdAt == request.time;
+        allow update: if isAdmin() || (isSignedIn() && (
+          existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'isEdited', 'updatedAt']) && incoming().updatedAt == request.time && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 1000
+        ));
+        allow delete: if isAdmin() || (isSignedIn() && (
+          existing().userId == request.auth.uid || 
+          isForumAuthor() ||
+          isModerator()
+        ));
+      }
+    }
+    // --- Posts ---
+    function isValidPost(data) {
+      return data.keys().hasAll(['userId', 'content', 'likesCount', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 2000 &&
+             data.likesCount is number &&
+             data.createdAt is timestamp;
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(postId) && isValidPost(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && (
+        (existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'updatedAt']) && incoming().updatedAt == request.time && incoming().content.size() > 0 && incoming().content.size() <= 2000) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount'])) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // --- Chats ---
+    function isValidChat(data) {
+      return data.keys().hasAll(['userId', 'userName', 'text', 'roomId', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.userName is string &&
+             (!('userAvatar' in data) || data.userAvatar is string) &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             data.roomId is string &&
+             data.createdAt is timestamp;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(chatId) && isValidChat(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && (existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'updatedAt']) && incoming().updatedAt == request.time && incoming().text.size() > 0 && incoming().text.size() <= 1000);
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // --- Notifications ---
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'title', 'body', 'read', 'createdAt']) &&
+             data.userId is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.body is string && data.body.size() <= 1000 &&
+             data.read is bool &&
+             data.createdAt is timestamp;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt']) && incoming().updatedAt == request.time;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}
